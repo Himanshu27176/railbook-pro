@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Dashboard — RailBook Pro</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="navbar" id="mainNav"></nav>
+
+<div class="hero">
+  <div class="hero-inner">
+    <h1>Find your <span>perfect train</span> 🚆</h1>
+    <p>Search from 20+ trains across all major Indian routes with real-time seat availability</p>
+    <div class="search-card">
+      <div class="search-grid">
+        <div class="field">
+          <label>🏠 From Station</label>
+          <input type="text" id="fromSt" placeholder="e.g. Mumbai, Delhi, Pune..." list="stList">
+        </div>
+        <div class="field">
+          <label>📍 To Station</label>
+          <input type="text" id="toSt" placeholder="e.g. Kolkata, Bengaluru..." list="stList">
+        </div>
+        <div class="field">
+          <label>📅 Date of Journey</label>
+          <input type="date" id="jDate">
+        </div>
+        <button class="btn btn-primary" onclick="doSearch()" style="height:42px;align-self:end">🔍 Search Trains</button>
+      </div>
+      <datalist id="stList">
+        <option value="Mumbai Central"><option value="Mumbai CST"><option value="New Delhi">
+        <option value="Kolkata Howrah"><option value="Sealdah"><option value="Chennai Central">
+        <option value="KSR Bengaluru"><option value="Pune"><option value="Hyderabad">
+        <option value="Ahmedabad"><option value="Amritsar"><option value="Bhopal">
+        <option value="Varanasi"><option value="Hazrat Nizamuddin"><option value="Ernakulam">
+        <option value="Thiruvananthapuram"><option value="Yesvantpur"><option value="Solapur">
+        <option value="Hubballi"><option value="Patna">
+      </datalist>
+    </div>
+  </div>
+</div>
+
+<div class="page">
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon">🎫</div>
+      <div><div class="stat-lbl">My Tickets</div><div class="stat-val" id="stTickets">—</div></div>
+    </div>
+    <div class="stat-card s-orange">
+      <div class="stat-icon">🚆</div>
+      <div><div class="stat-lbl">Available Trains</div><div class="stat-val" id="stTrains">—</div></div>
+    </div>
+    <div class="stat-card s-green">
+      <div class="stat-icon">✅</div>
+      <div><div class="stat-lbl">Confirmed</div><div class="stat-val" id="stConfirmed">—</div></div>
+    </div>
+    <div class="stat-card s-red">
+      <div class="stat-icon">❌</div>
+      <div><div class="stat-lbl">Cancelled</div><div class="stat-val" id="stCancelled">—</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Recent Bookings</h2>
+      <a href="mytickets.html" class="btn btn-outline btn-sm">View All →</a>
+    </div>
+    <div id="recentArea"><div class="loader">Loading recent bookings</div></div>
+  </div>
+</div>
+
+<script src="utils.js"></script>
+<script>
+const user = requireLogin();
+renderNav('dashboard');
+
+const todayStr = new Date().toISOString().split('T')[0];
+document.getElementById('jDate').min   = todayStr;
+document.getElementById('jDate').value = todayStr;
+
+function doSearch(){
+  const from = document.getElementById('fromSt').value.trim();
+  const to   = document.getElementById('toSt').value.trim();
+  const date = document.getElementById('jDate').value;
+  if(!from||!to){ alert('Please enter From and To station'); return; }
+  window.location.href=`trains.html?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&date=${date}`;
+}
+
+async function loadDashboard(){
+  try{
+    const [tr, tk] = await Promise.all([
+      fetch(`${API}/trains`).then(r=>r.json()),
+      fetch(`${API}/my-tickets/${user.id}`).then(r=>r.json())
+    ]);
+    document.getElementById('stTrains').textContent    = tr.trains?.length || 0;
+    document.getElementById('stTickets').textContent   = tk.tickets?.length || 0;
+    document.getElementById('stConfirmed').textContent = tk.tickets?.filter(t=>t.booking_status==='Confirmed').length || 0;
+    document.getElementById('stCancelled').textContent = tk.tickets?.filter(t=>t.booking_status==='Cancelled').length || 0;
+
+    const recent = (tk.tickets||[]).slice(0,5);
+    const el = document.getElementById('recentArea');
+    if(!recent.length){
+      el.innerHTML=`<div class="empty"><div class="ei">🎫</div><p>No bookings yet. <a href="trains.html" style="color:var(--blue)">Search trains to book your first ticket!</a></p></div>`;
+      return;
+    }
+    el.innerHTML=`<div class="tw"><table>
+      <thead><tr><th>PNR</th><th>Train</th><th>Route</th><th>Date</th><th>Class</th><th>Passengers</th><th>Fare</th><th>Status</th></tr></thead>
+      <tbody>
+        ${recent.map(t=>`<tr>
+          <td><a href="pnr.html?pnr=${t.pnr}" style="font-family:'DM Mono',monospace;font-size:.78rem;color:var(--saffron);font-weight:600;text-decoration:none">${t.pnr}</a></td>
+          <td><strong>${t.train_name}</strong><br><span style="font-size:.72rem;color:var(--text3)">${t.train_number}</span></td>
+          <td style="font-size:.82rem">${t.source} → ${t.destination}</td>
+          <td style="font-size:.82rem">${formatDate(t.journey_date)}</td>
+          <td><span class="badge b-blue">${t.class_code}</span></td>
+          <td style="font-size:.82rem">${(t.passengers||[]).length} pax</td>
+          <td><strong>₹${Number(t.total_fare).toLocaleString('en-IN')}</strong></td>
+          <td>${statusBadge(t.booking_status)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+  } catch(e){ console.error(e); }
+}
+loadDashboard();
+</script>
+</body>
+</html>

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Profile — RailBook Pro</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="navbar" id="mainNav"></nav>
+<div class="page">
+  <div class="page-hdr"><h1>My Profile 👤</h1><p>Manage your account details and view your activity</p></div>
+
+  <div id="msg" class="alert"></div>
+
+  <div class="profile-header">
+    <div class="profile-avatar" id="pAvatar">?</div>
+    <div>
+      <div style="font-family:Sora,sans-serif;font-size:1.3rem;font-weight:700" id="pName">Loading...</div>
+      <div style="color:rgba(255,255,255,.65);font-size:.88rem;margin-top:3px" id="pEmail">—</div>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap" id="pBadges"></div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <!-- EDIT FORM -->
+    <div class="card">
+      <div class="card-head"><h2>Edit Profile</h2></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="eName">
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="tel" id="ePhone">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Gender</label>
+            <select id="eGender">
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Date of Birth</label>
+            <input type="date" id="eDob">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Email (cannot change)</label>
+          <input type="email" id="eEmail" disabled style="opacity:.6">
+        </div>
+        <button class="btn btn-primary" onclick="saveProfile()">💾 Save Changes</button>
+      </div>
+    </div>
+
+    <!-- STATS PANEL -->
+    <div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head"><h2>Account Summary</h2></div>
+        <div class="card-body">
+          <div id="profileStats"><div class="loader">Loading stats</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Quick Links</h2></div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:8px">
+          <a href="mytickets.html" class="btn btn-outline">📋 View All Tickets</a>
+          <a href="pnr.html"       class="btn btn-outline">🔍 Check PNR Status</a>
+          <a href="trains.html"    class="btn btn-outline">🚆 Search Trains</a>
+          <button class="btn btn-red" onclick="logout()">🚪 Logout</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="utils.js"></script>
+<script>
+const user = requireLogin();
+renderNav('profile');
+
+async function loadProfile(){
+  try{
+    const [profRes, tkRes] = await Promise.all([
+      fetch(`${API}/profile/${user.id}`).then(r=>r.json()),
+      fetch(`${API}/my-tickets/${user.id}`).then(r=>r.json())
+    ]);
+
+    const prof = profRes.user;
+    document.getElementById('pAvatar').textContent = prof.name[0].toUpperCase();
+    document.getElementById('pName').textContent   = prof.name;
+    document.getElementById('pEmail').textContent  = prof.email;
+    document.getElementById('pBadges').innerHTML   = `
+      <span class="badge b-green">✅ Active Account</span>
+      <span class="badge b-blue">${prof.gender}</span>
+      <span class="badge b-grey">Joined ${formatDate(prof.created_at)}</span>`;
+
+    document.getElementById('eName').value   = prof.name;
+    document.getElementById('ePhone').value  = prof.phone||'';
+    document.getElementById('eGender').value = prof.gender||'Male';
+    document.getElementById('eDob').value    = prof.dob?prof.dob.split('T')[0]:'';
+    document.getElementById('eEmail').value  = prof.email;
+
+    const tickets  = tkRes.tickets||[];
+    const confirmed= tickets.filter(t=>t.booking_status==='Confirmed').length;
+    const cancelled= tickets.filter(t=>t.booking_status==='Cancelled').length;
+    const totalSpent= tickets.filter(t=>t.payment_status==='Paid').reduce((s,t)=>s+Number(t.total_fare),0);
+
+    document.getElementById('profileStats').innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="background:var(--s2);border-radius:var(--r);padding:14px;text-align:center;border:1.5px solid var(--border)">
+          <div style="font-size:1.5rem;font-weight:700;font-family:Sora,sans-serif;color:var(--blue)">${tickets.length}</div>
+          <div style="font-size:.78rem;color:var(--text3)">Total Bookings</div>
+        </div>
+        <div style="background:var(--green-bg);border-radius:var(--r);padding:14px;text-align:center;border:1.5px solid #c8e6c9">
+          <div style="font-size:1.5rem;font-weight:700;font-family:Sora,sans-serif;color:var(--green)">${confirmed}</div>
+          <div style="font-size:.78rem;color:var(--green)">Confirmed</div>
+        </div>
+        <div style="background:var(--red-bg);border-radius:var(--r);padding:14px;text-align:center;border:1.5px solid #ffcdd2">
+          <div style="font-size:1.5rem;font-weight:700;font-family:Sora,sans-serif;color:var(--red)">${cancelled}</div>
+          <div style="font-size:.78rem;color:var(--red)">Cancelled</div>
+        </div>
+        <div style="background:#fff3e0;border-radius:var(--r);padding:14px;text-align:center;border:1.5px solid #ffe0b2">
+          <div style="font-size:1.1rem;font-weight:700;font-family:Sora,sans-serif;color:var(--saffron)">₹${totalSpent.toLocaleString('en-IN')}</div>
+          <div style="font-size:.78rem;color:var(--saffron)">Total Spent</div>
+        </div>
+      </div>`;
+  } catch(e){ console.error(e); }
+}
+
+async function saveProfile(){
+  const name  = document.getElementById('eName').value.trim();
+  const phone = document.getElementById('ePhone').value.trim();
+  const gender= document.getElementById('eGender').value;
+  const dob   = document.getElementById('eDob').value;
+  if(!name) return showAlert('msg','Name cannot be empty');
+  try{
+    const d=await fetch(`${API}/profile/${user.id}`,{
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name,phone,gender,dob})
+    }).then(r=>r.json());
+    if(d.success){
+      const updated={...user,name};
+      localStorage.setItem('rb_user',JSON.stringify(updated));
+      showAlert('msg','✅ Profile updated!','success');
+      loadProfile();
+    } else { showAlert('msg',d.message); }
+  } catch(e){ showAlert('msg','Update failed. Check server.'); }
+}
+
+loadProfile();
+</script>
+</body>
+</html>

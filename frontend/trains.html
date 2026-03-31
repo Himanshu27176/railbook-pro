@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Trains — RailBook Pro</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="navbar" id="mainNav"></nav>
+
+<div class="hero" style="padding-bottom:26px">
+  <div class="hero-inner">
+    <h1>Search <span>Trains</span> 🔍</h1>
+    <p>Find trains between any two stations — showing fare per class, duration, and live days</p>
+    <div class="search-card" style="border-radius:var(--rl)">
+      <div class="search-grid">
+        <div class="field">
+          <label>🏠 From</label>
+          <input type="text" id="fromSt" placeholder="Departure city..." list="stList">
+        </div>
+        <div class="field">
+          <label>📍 To</label>
+          <input type="text" id="toSt" placeholder="Arrival city..." list="stList">
+        </div>
+        <div class="field">
+          <label>📅 Date</label>
+          <input type="date" id="jDate">
+        </div>
+        <button class="btn btn-primary" onclick="doSearch()" style="height:42px;align-self:end">🔍 Search</button>
+      </div>
+      <datalist id="stList">
+        <option value="Mumbai Central"><option value="Mumbai CST"><option value="New Delhi">
+        <option value="Kolkata Howrah"><option value="Sealdah"><option value="Chennai Central">
+        <option value="KSR Bengaluru"><option value="Pune"><option value="Hyderabad">
+        <option value="Ahmedabad"><option value="Amritsar"><option value="Bhopal">
+        <option value="Varanasi"><option value="Hazrat Nizamuddin"><option value="Ernakulam">
+        <option value="Thiruvananthapuram"><option value="Yesvantpur"><option value="Solapur">
+        <option value="Hubballi"><option value="Patna">
+      </datalist>
+    </div>
+  </div>
+</div>
+
+<div class="page">
+  <div id="resultArea"><div class="loader">Loading trains</div></div>
+</div>
+
+<script src="utils.js"></script>
+<script>
+requireLogin();
+renderNav('trains');
+
+const params = new URLSearchParams(window.location.search);
+const fromQ  = params.get('from') || '';
+const toQ    = params.get('to')   || '';
+const dateQ  = params.get('date') || new Date().toISOString().split('T')[0];
+
+document.getElementById('fromSt').value = fromQ;
+document.getElementById('toSt').value   = toQ;
+document.getElementById('jDate').value  = dateQ;
+document.getElementById('jDate').min    = new Date().toISOString().split('T')[0];
+
+if(fromQ && toQ) loadSearch(fromQ, toQ, dateQ);
+else             loadAll();
+
+function doSearch(){
+  const from=document.getElementById('fromSt').value.trim();
+  const to  =document.getElementById('toSt').value.trim();
+  const date=document.getElementById('jDate').value;
+  if(!from||!to){ alert('Please enter both From and To station'); return; }
+  history.replaceState({},'',`?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&date=${date}`);
+  loadSearch(from,to,date);
+}
+
+async function loadAll(){
+  document.getElementById('resultArea').innerHTML='<div class="loader">Loading all trains</div>';
+  try{
+    const d=await fetch(`${API}/trains`).then(r=>r.json());
+    render(d.trains||[], 'All Available Trains ('+( d.trains?.length||0)+' trains)', dateQ);
+  } catch(e){ showErr(); }
+}
+
+async function loadSearch(from,to,date){
+  document.getElementById('resultArea').innerHTML='<div class="loader">Searching trains</div>';
+  try{
+    const d=await fetch(`${API}/trains/search?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&date=${date}`).then(r=>r.json());
+    const title = d.trains?.length
+      ? `${d.trains.length} Train${d.trains.length>1?'s':''} found: ${from} → ${to} on ${formatDate(date)}`
+      : `No trains found: ${from} → ${to}`;
+    render(d.trains||[], title, date);
+  } catch(e){ showErr(); }
+}
+
+function showErr(){
+  document.getElementById('resultArea').innerHTML='<div class="empty"><div class="ei">⚠️</div><p>Could not connect to server. Is backend running?</p></div>';
+}
+
+function render(trains, title, date){
+  const area=document.getElementById('resultArea');
+  if(!trains.length){
+    area.innerHTML=`<div class="page-hdr"><h1>${title}</h1></div><div class="empty"><div class="ei">🔍</div><p>No trains found. Try searching a different route or date.</p></div>`;
+    return;
+  }
+  area.innerHTML=`
+    <div class="page-hdr" style="margin-bottom:16px"><h1>${title}</h1><p>Click a class button to book instantly</p></div>
+    ${trains.map(t=>renderCard(t,date)).join('')}`;
+}
+
+function renderCard(t, date){
+  const clsHTML = (t.classes||[]).map(c=>`
+    <div class="cls-btn" onclick="selectClass('${t.id}','${c.code}',${calcFare(c.fare,t.distance_km)},'${encodeURIComponent(t.source)}','${encodeURIComponent(t.destination)}','${date}')">
+      <div class="cls-code">${c.code}</div>
+      <div class="cls-name">${c.name}</div>
+      <div class="cls-fare">₹${calcFare(c.fare,t.distance_km).toLocaleString('en-IN')}</div>
+      <div style="font-size:.64rem;color:var(--text3);margin-top:1px">${c.seats} seats</div>
+    </div>`).join('');
+
+  return `<div class="tc">
+    <div class="tc-head">
+      <div>
+        <div class="tc-num">#${t.train_number}</div>
+        <div class="tc-name">${t.name}</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">${typeBadge(t.type)}<span class="badge ${t.status==='Active'?'b-green':'b-red'}">${t.status}</span></div>
+    </div>
+    <div class="tc-body">
+      <div class="tc-journey">
+        <div class="tc-station">
+          <div class="tc-time">${formatTime(t.departure)}</div>
+          <div class="tc-city">${t.source}</div>
+        </div>
+        <div class="tc-line">
+          <div class="tc-line-bar"></div>
+          <div class="tc-dur">⏱ ${t.duration}</div>
+          <div class="tc-dist">📏 ${t.distance_km} km</div>
+        </div>
+        <div class="tc-station" style="text-align:right">
+          <div class="tc-time">${formatTime(t.arrival)}</div>
+          <div class="tc-city">${t.destination}</div>
+        </div>
+      </div>
+      <div class="tc-footer">
+        <div>
+          <div style="font-size:.68rem;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Runs On</div>
+          <div class="days-row">${daysRow(t.runs_on)}</div>
+        </div>
+        <div>
+          <div style="font-size:.68rem;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Select Class to Book</div>
+          <div class="classes-row">${clsHTML || '<span style="color:var(--text3);font-size:.82rem">No classes available</span>'}</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function selectClass(trainId, classCode, fare, from, to, date){
+  window.location.href=`book.html?train=${trainId}&class=${classCode}&fare=${fare}&from=${from}&to=${to}&date=${date}`;
+}
+</script>
+</body>
+</html>

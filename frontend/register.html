@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Register — RailBook Pro</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-left">
+    <div>
+      <div style="font-family:Sora,sans-serif;font-size:1.2rem;font-weight:800;color:#fff;margin-bottom:36px">
+        🚂 Rail<em style="color:#ff9800;font-style:normal">Book</em>
+        <span style="font-size:.52rem;background:#f57c00;padding:2px 6px;border-radius:4px;margin-left:6px;letter-spacing:1px;font-weight:700">PRO</span>
+      </div>
+      <h1>Start your<br><em>journey</em> today</h1>
+      <p>Create your free account and get access to the full railway reservation experience — quick, easy and reliable.</p>
+      <div class="auth-features">
+        <div class="af"><div class="af-icon">⚡</div>Register in under 60 seconds</div>
+        <div class="af"><div class="af-icon">🔒</div>Safe &amp; secure bookings</div>
+        <div class="af"><div class="af-icon">📋</div>Full booking history &amp; PNR tracking</div>
+        <div class="af"><div class="af-icon">🌐</div>20+ trains, all major Indian routes</div>
+      </div>
+    </div>
+  </div>
+  <div class="auth-right">
+    <div class="auth-box">
+      <p class="at">Create your account</p>
+      <p class="as">It's free and only takes a minute</p>
+      <div id="msg" class="alert"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Full Name *</label>
+          <input type="text" id="name" placeholder="John Doe">
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="tel" id="phone" placeholder="10-digit">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Email Address *</label>
+        <input type="email" id="email" placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label>Password *</label>
+        <input type="password" id="password" placeholder="Create a password">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Gender</label>
+          <select id="gender">
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Date of Birth</label>
+          <input type="date" id="dob">
+        </div>
+      </div>
+      <button class="btn btn-primary btn-block" id="regBtn" onclick="doRegister()">Create Account →</button>
+      <div class="auth-link" style="margin-top:18px">
+        Already have an account? <a href="login.html">Login here</a>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="utils.js"></script>
+<script>
+if(getUser()) window.location.href='dashboard.html';
+async function doRegister(){
+  const name=document.getElementById('name').value.trim();
+  const email=document.getElementById('email').value.trim();
+  const password=document.getElementById('password').value.trim();
+  const phone=document.getElementById('phone').value.trim();
+  const gender=document.getElementById('gender').value;
+  const dob=document.getElementById('dob').value;
+  if(!name||!email||!password) return showAlert('msg','Name, email and password are required');
+  const btn=document.getElementById('regBtn');
+  btn.disabled=true; btn.textContent='Creating account...';
+  try{
+    const r=await fetch(`${API}/register`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,email,password,phone,gender,dob})});
+    const d=await r.json();
+    if(d.success){
+      showAlert('msg','✅ '+d.message,'success');
+      setTimeout(()=>window.location.href='login.html',1500);
+    } else {
+      showAlert('msg',d.message);
+      btn.disabled=false; btn.textContent='Create Account →';
+    }
+  } catch(e){
+    showAlert('msg','⚠️ Cannot connect. Is backend running?');
+    btn.disabled=false; btn.textContent='Create Account →';
+  }
+}
+</script>
+</body>
+</html>

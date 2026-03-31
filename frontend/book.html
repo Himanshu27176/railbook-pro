@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Book Ticket — RailBook Pro</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="navbar" id="mainNav"></nav>
+<div class="page">
+  <div class="page-hdr"><h1>Book Ticket 🎫</h1><p>Complete the steps below to confirm your booking</p></div>
+
+  <!-- STEPS BAR -->
+  <div class="steps">
+    <div class="step active" id="s1"><div class="step-n">1</div><div class="step-lbl">Train & Class</div></div>
+    <div class="step-line"></div>
+    <div class="step" id="s2"><div class="step-n">2</div><div class="step-lbl">Passengers</div></div>
+    <div class="step-line"></div>
+    <div class="step" id="s3"><div class="step-n">3</div><div class="step-lbl">Review & Pay</div></div>
+  </div>
+
+  <div id="msg" class="alert"></div>
+
+  <div style="display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:start">
+    <!-- PANELS -->
+    <div>
+      <!-- PANEL 1 -->
+      <div class="card" id="p1">
+        <div class="card-head"><h2>🚆 Train & Class</h2></div>
+        <div class="card-body">
+          <div id="trainInfoBox"><div class="loader">Loading train details</div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">
+            <div class="form-group">
+              <label>Class *</label>
+              <select id="classCode" onchange="updateFare()">
+                <option value="">Loading...</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Journey Date *</label>
+              <input type="date" id="journeyDate" onchange="updateFare()">
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-group">
+              <label>From Station</label>
+              <input type="text" id="fromSt" placeholder="Boarding station">
+            </div>
+            <div class="form-group">
+              <label>To Station</label>
+              <input type="text" id="toSt" placeholder="Destination">
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <div class="form-group" style="margin-bottom:0;flex:0 0 170px">
+              <label>Number of Passengers</label>
+              <select id="paxCount" onchange="updateFare()">
+                <option value="1">1 Passenger</option>
+                <option value="2">2 Passengers</option>
+                <option value="3">3 Passengers</option>
+                <option value="4">4 Passengers</option>
+                <option value="5">5 Passengers</option>
+                <option value="6">6 Passengers</option>
+              </select>
+            </div>
+            <div style="align-self:flex-end">
+              <button class="btn btn-primary" onclick="goStep2()">Next: Passenger Details →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PANEL 2 -->
+      <div class="card" id="p2" style="display:none">
+        <div class="card-head">
+          <h2>👥 Passenger Details</h2>
+          <button class="btn btn-outline btn-sm" onclick="goStep1()">← Back</button>
+        </div>
+        <div class="card-body">
+          <div id="paxForms"></div>
+          <button class="btn btn-primary" onclick="goStep3()">Next: Review Booking →</button>
+        </div>
+      </div>
+
+      <!-- PANEL 3 -->
+      <div class="card" id="p3" style="display:none">
+        <div class="card-head">
+          <h2>✅ Review & Confirm</h2>
+          <button class="btn btn-outline btn-sm" onclick="goStep2()">← Back</button>
+        </div>
+        <div class="card-body">
+          <div id="reviewBox"></div>
+          <div style="margin-top:20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-green" id="confirmBtn" onclick="confirmBooking()">✅ Confirm &amp; Book Ticket</button>
+            <span style="font-size:.78rem;color:var(--text3)">🔒 Secure booking — Instant PNR</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FARE SUMMARY -->
+    <div>
+      <div class="fare-box">
+        <h3>💰 Fare Summary</h3>
+        <div class="fare-row"><span>Train</span><span id="fs-train">—</span></div>
+        <div class="fare-row"><span>Class</span><span id="fs-class">—</span></div>
+        <div class="fare-row"><span>Date</span><span id="fs-date">—</span></div>
+        <div class="fare-row"><span>Passengers</span><span id="fs-pax">—</span></div>
+        <div class="fare-row"><span>Base fare/person</span><span id="fs-base">—</span></div>
+        <div class="fare-row"><span>GST (5%)</span><span id="fs-gst">—</span></div>
+        <div class="fare-row"><span>Reservation charge</span><span>₹15/person</span></div>
+        <div class="fare-row total"><span>Total Payable</span><span id="fs-total">—</span></div>
+      </div>
+      <div style="margin-top:14px;background:var(--green-bg);border-radius:var(--r);padding:12px;font-size:.8rem;color:var(--green)">
+        ✅ <strong>Free cancellation</strong> within 4 hours<br>
+        🎫 Instant PNR on confirmation<br>
+        💳 Refund in 5–7 business days
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="utils.js"></script>
+<script>
+const user = requireLogin();
+renderNav('book');
+
+const p     = new URLSearchParams(window.location.search);
+const trainId  = p.get('train')  || '';
+const preClass = p.get('class')  || '';
+const preFrom  = p.get('from')   || '';
+const preTo    = p.get('to')     || '';
+const preDate  = p.get('date')   || new Date().toISOString().split('T')[0];
+const preFare  = +p.get('fare')  || 0;
+
+let trainData = null, classesData = [];
+
+// set initial values
+document.getElementById('journeyDate').value = preDate;
+document.getElementById('journeyDate').min   = new Date().toISOString().split('T')[0];
+document.getElementById('fromSt').value = decodeURIComponent(preFrom);
+document.getElementById('toSt').value   = decodeURIComponent(preTo);
+
+// ── INIT ────────────────────────────────────────────────────────
+async function init(){
+  if(!trainId){
+    document.getElementById('trainInfoBox').innerHTML='<p>No train selected. <a href="trains.html">← Go back to search</a></p>';
+    return;
+  }
+  try{
+    const d = await fetch(`${API}/trains/${trainId}`).then(r=>r.json());
+    trainData  = d.train;
+    classesData= d.classes||[];
+
+    document.getElementById('trainInfoBox').innerHTML=`
+      <div style="background:var(--navy2);border-radius:var(--r);padding:14px;color:#fff">
+        <div style="font-family:'DM Mono',monospace;font-size:.72rem;color:rgba(255,255,255,.5)">#${trainData.train_number}</div>
+        <div style="font-family:Sora,sans-serif;font-weight:700;font-size:1rem;margin:3px 0">${trainData.name}</div>
+        <div style="display:flex;gap:18px;font-size:.82rem;color:rgba(255,255,255,.72);flex-wrap:wrap;margin-top:4px">
+          <span>🕐 ${formatTime(trainData.departure)} → ${formatTime(trainData.arrival)}</span>
+          <span>⏱ ${trainData.duration}</span>
+          <span>📏 ${trainData.distance_km} km</span>
+          <span>${typeBadge(trainData.type)}</span>
+        </div>
+      </div>`;
+
+    const sel = document.getElementById('classCode');
+    sel.innerHTML='<option value="">— Select Class —</option>';
+    classesData.forEach(c=>{
+      const fare = calcFare(c.fare_per_km, trainData.distance_km);
+      const opt  = document.createElement('option');
+      opt.value = c.class_code;
+      opt.textContent = `${c.class_code} — ${c.class_name} (₹${fare.toLocaleString('en-IN')}/person)`;
+      opt.dataset.fare = fare;
+      if(c.class_code===preClass) opt.selected=true;
+      sel.appendChild(opt);
+    });
+
+    // set source/dest from train if empty
+    if(!document.getElementById('fromSt').value) document.getElementById('fromSt').value=trainData.source;
+    if(!document.getElementById('toSt').value)   document.getElementById('toSt').value=trainData.destination;
+
+    document.getElementById('fs-train').textContent = trainData.name;
+    updateFare();
+  } catch(e){ document.getElementById('trainInfoBox').innerHTML='<p style="color:red">Failed to load train info</p>'; }
+}
+
+function updateFare(){
+  const sel   = document.getElementById('classCode');
+  const opt   = sel.options[sel.selectedIndex];
+  const fare  = opt?.dataset?.fare ? +opt.dataset.fare : preFare;
+  const pax   = +document.getElementById('paxCount').value || 1;
+  const base  = fare > 0 ? Math.round((fare-15)/1.05) : 0;
+  const gst   = fare > 0 ? Math.round(base*0.05) : 0;
+  const total = fare * pax;
+  const date  = document.getElementById('journeyDate').value;
+
+  document.getElementById('fs-class').textContent = sel.value || '—';
+  document.getElementById('fs-date').textContent  = date ? formatDate(date) : '—';
+  document.getElementById('fs-pax').textContent   = pax;
+  document.getElementById('fs-base').textContent  = fare>0 ? `₹${base.toLocaleString('en-IN')}` : '—';
+  document.getElementById('fs-gst').textContent   = fare>0 ? `₹${gst.toLocaleString('en-IN')}` : '—';
+  document.getElementById('fs-total').textContent = fare>0 ? `₹${total.toLocaleString('en-IN')}` : '—';
+}
+
+// ── STEP 2 ──────────────────────────────────────────────────────
+function goStep1(){ setStep(1); }
+function goStep2(){ setStep(2); }
+
+function goStep2(){
+  const cls  = document.getElementById('classCode').value;
+  const date = document.getElementById('journeyDate').value;
+  const from = document.getElementById('fromSt').value.trim();
+  const to   = document.getElementById('toSt').value.trim();
+  if(!cls)  return showAlert('msg','Please select a class');
+  if(!date) return showAlert('msg','Please select journey date');
+  if(!from||!to) return showAlert('msg','Please fill From and To stations');
+
+  const count = +document.getElementById('paxCount').value;
+  const pForms = document.getElementById('paxForms');
+  pForms.innerHTML = Array.from({length:count},(_,i)=>`
+    <div class="pax-row">
+      <div class="pax-row-title"><span>Passenger ${i+1}</span><span style="color:var(--text3);font-weight:400">All fields required</span></div>
+      <div class="pax-grid">
+        <div class="form-group" style="margin:0">
+          <label>Full Name</label>
+          <input type="text" id="pname${i}" placeholder="Enter full name">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Age</label>
+          <input type="number" id="page${i}" placeholder="25" min="1" max="120">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Gender</label>
+          <select id="pgender${i}">
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Berth Preference</label>
+          <select id="pberth${i}">
+            <option value="No Preference">No Preference</option>
+            <option value="Lower">Lower</option>
+            <option value="Middle">Middle</option>
+            <option value="Upper">Upper</option>
+            <option value="Side Lower">Side Lower</option>
+            <option value="Side Upper">Side Upper</option>
+          </select>
+        </div>
+      </div>
+    </div>`).join('');
+
+  setStep(2);
+}
+
+// ── STEP 3 ──────────────────────────────────────────────────────
+function goStep3(){
+  const count  = +document.getElementById('paxCount').value;
+  const paxArr = [];
+  for(let i=0;i<count;i++){
+    const name=document.getElementById(`pname${i}`).value.trim();
+    const age =document.getElementById(`page${i}`).value.trim();
+    if(!name||!age){ showAlert('msg',`Fill all fields for Passenger ${i+1}`); return; }
+    if(age<1||age>120){ showAlert('msg',`Invalid age for Passenger ${i+1}`); return; }
+    paxArr.push({
+      name, age:+age,
+      gender: document.getElementById(`pgender${i}`).value,
+      berth_pref: document.getElementById(`pberth${i}`).value
+    });
+  }
+
+  const cls  = document.getElementById('classCode');
+  const fare = +cls.options[cls.selectedIndex]?.dataset?.fare || preFare;
+  const paxTotal = fare * count;
+  const date = document.getElementById('journeyDate').value;
+  const from = document.getElementById('fromSt').value;
+  const to   = document.getElementById('toSt').value;
+
+  document.getElementById('reviewBox').innerHTML=`
+    <div style="background:var(--s2);border-radius:var(--r);padding:16px;margin-bottom:16px;border:1.5px solid var(--border)">
+      <div style="font-size:.8rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Journey Details</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:.88rem">
+        <div><span style="color:var(--text3)">Train:</span> <strong>${trainData?.name}</strong></div>
+        <div><span style="color:var(--text3)">Class:</span> <span class="badge b-blue">${cls.value}</span></div>
+        <div><span style="color:var(--text3)">From:</span> <strong>${from}</strong></div>
+        <div><span style="color:var(--text3)">To:</span> <strong>${to}</strong></div>
+        <div><span style="color:var(--text3)">Date:</span> <strong>${formatDate(date)}</strong></div>
+        <div><span style="color:var(--text3)">Total Fare:</span> <strong style="color:var(--green)">₹${paxTotal.toLocaleString('en-IN')}</strong></div>
+      </div>
+    </div>
+    <div style="font-size:.8rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Passengers (${count})</div>
+    <table class="pax-table">
+      <thead><tr><th>#</th><th>Name</th><th>Age</th><th>Gender</th><th>Berth Pref</th></tr></thead>
+      <tbody>
+        ${paxArr.map((p,i)=>`<tr>
+          <td>${i+1}</td><td><strong>${p.name}</strong></td><td>${p.age}</td>
+          <td>${p.gender}</td><td>${p.berth_pref}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+
+  // store for confirm
+  window._bookData = { paxArr, cls:cls.value, date, from, to, fare, paxTotal };
+  setStep(3);
+}
+
+// ── CONFIRM ─────────────────────────────────────────────────────
+async function confirmBooking(){
+  const bd  = window._bookData;
+  if(!bd) return;
+  const btn = document.getElementById('confirmBtn');
+  btn.disabled=true; btn.textContent='Booking...';
+
+  try{
+    const r = await fetch(`${API}/book-ticket`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        user_id:    user.id,
+        train_id:   trainId,
+        class_code: bd.cls,
+        journey_date: bd.date,
+        source:     bd.from,
+        destination:bd.to,
+        passengers: bd.paxArr
+      })
+    });
+    const d = await r.json();
+    if(d.success){
+      // Show success screen
+      document.getElementById('p3').innerHTML=`
+        <div style="text-align:center;padding:40px 20px">
+          <div style="font-size:3rem">🎉</div>
+          <h2 style="font-family:Sora,sans-serif;margin:12px 0 6px">Ticket Booked Successfully!</h2>
+          <p style="color:var(--text3);margin-bottom:20px">Your PNR number is below. Keep it safe!</p>
+          <div style="background:var(--navy);display:inline-block;padding:16px 32px;border-radius:var(--r);margin-bottom:20px">
+            <div style="font-size:.7rem;color:rgba(255,255,255,.5);letter-spacing:1px;text-transform:uppercase">PNR Number</div>
+            <div style="font-family:'DM Mono',monospace;font-size:1.6rem;font-weight:600;color:var(--saffron2);letter-spacing:3px">${d.pnr}</div>
+          </div>
+          <div style="color:var(--text3);font-size:.88rem;margin-bottom:24px">Total Paid: <strong style="color:var(--green)">₹${Number(d.total_fare).toLocaleString('en-IN')}</strong></div>
+          <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+            <a href="mytickets.html" class="btn btn-primary">View My Tickets</a>
+            <a href="pnr.html?pnr=${d.pnr}" class="btn btn-outline">Check PNR Status</a>
+            <a href="trains.html" class="btn btn-outline">Book Another</a>
+          </div>
+        </div>`;
+    } else {
+      showAlert('msg', d.message);
+      btn.disabled=false; btn.textContent='✅ Confirm & Book Ticket';
+    }
+  } catch(e){
+    showAlert('msg','Booking failed. Check server connection.');
+    btn.disabled=false; btn.textContent='✅ Confirm & Book Ticket';
+  }
+}
+
+function setStep(n){
+  [1,2,3].forEach(i=>{
+    document.getElementById('p'+i).style.display = i===n?'':'none';
+    const s=document.getElementById('s'+i);
+    s.className='step'+(i===n?' active':i<n?' done':'');
+  });
+}
+
+init();
+</script>
+</body>
+</html>
